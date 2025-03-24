@@ -1,5 +1,6 @@
 import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.module.js';
 
+
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
@@ -20,6 +21,12 @@ starGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 });
 const stars = new THREE.Points(starGeometry, starMaterial);
 scene.add(stars);
+
+//Player data
+const selfUsername = 'spacePilot';
+const playerColor = "E0E0E0";
+let currentSpeed = 0;
+const gameUrl = 'https://astro-stormv1.netlify.app/';
 
 // Spaceship
 const spaceship = new THREE.Group();
@@ -121,6 +128,155 @@ const flameRight = new THREE.Mesh(flameGeometry, flameMaterial);
 flameRight.position.set(0.1, -0.3, 0);
 flameRight.rotation.x = Math.PI;
 spaceship.add(flameRight);
+
+//Create start portal (if entering via portal)
+let startPortalBox = null;
+if (new URLSearchParams(window.location.search).get('portal')) {
+    const startPortalGroup = new THREE.Group();
+    startPortalGroup.position.set(0, 0, 0);
+    startPortalGroup.rotation.z = 0;
+
+    const startPortalGeometry = new THREE.TorusGeometry(0.5, 0.05, 16, 100);
+    const startPortalMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0.8
+    });
+    const startPortal = new THREE.Mesh(startPortalGeometry, startPortalMaterial);
+    startPortalGroup.add(startPortal);
+
+    const startPortalInnerGeometry = new THREE.CircleGeometry(0.4, 32);
+    const startPortalInnerMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide
+    });
+    const startPortalInner = new THREE.Mesh(startPortalInnerGeometry, startPortalInnerMaterial);
+    startPortalGroup.add(startPortalInner);
+
+    const startPortalParticleCount = 100;
+    const startPortalParticles = new THREE.BufferGeometry();
+    const startPortalPositions = new Float32Array(startPortalParticleCount * 3);
+    const startPortalColors = new Float32Array(startPortalParticleCount * 3);
+
+    for (let i = 0; i < startPortalParticleCount * 3; i += 3) {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 0.5 + (Math.random() - 0.5) * 0.2;
+        startPortalPositions[i] = Math.cos(angle) * radius;
+        startPortalPositions[i + 1] = Math.sin(angle) * radius;
+        startPortalPositions[i + 2] = 0;
+
+        startPortalColors[i] = 0.8 + Math.random() * 0.2;
+        startPortalColors[i + 1] = 0;
+        startPortalColors[i + 2] = 0;
+    }
+
+    startPortalParticles.setAttribute('position', new THREE.BufferAttribute(startPortalPositions, 3));
+    startPortalParticles.setAttribute('color', new THREE.BufferAttribute(startPortalColors, 3));
+
+    const startPortalParticleMaterial = new THREE.PointsMaterial({
+        size: 0.02,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.6
+    });
+
+    const startPortalParticleSystem = new THREE.Points(startPortalParticles, startPortalParticleMaterial);
+    startPortalGroup.add(startPortalParticleSystem);
+
+    scene.add(startPortalGroup);
+    startPortalBox = new THREE.Box3().setFromObject(startPortalGroup);
+
+    function animateStartPortal() {
+        const positions = startPortalParticles.attributes.position.array;
+        for (let i = 0; i < positions.length; i += 3) {
+            positions[i + 1] += 0.005 * Math.sin(Date.now() * 0.001 + i);
+        }
+        startPortalParticles.attributes.position.needsUpdate = true;
+        requestAnimationFrame(animateStartPortal);
+    }
+    animateStartPortal();
+}
+
+//Create exit portal
+let exitPortalBox = null;
+const exitPortalGroup = new THREE.Group();
+exitPortalGroup.position.set(5, 3, 0);
+exitPortalGroup.rotation.z = 0;
+
+const exitPortalGeometry = new THREE.TorusGeometry(0.5, 0.05, 16, 100);
+const exitPortalMaterial = new THREE.MeshBasicMaterial({
+    color: 0x00ff00,
+    transparent: true,
+    opacity: 0.5,
+    side: THREE.DoubleSide
+});
+const exitPortalInner = new THREE.Mesh(exitPortalInnerGeometry, exitPortalInnerMaterial);
+exitPortalGroup.add(exitPortalInner);
+
+const canvas = document.createElement('canvas');
+const context = canvas.getContext('2d');
+canvas.width = 256;
+canvas.height = 32;
+context.fillStyle = '#00ff00';
+context.font = 'bold 16px Arial';
+context.textAlign = 'center';
+context.fillText('VIBEVERSE PORTAL', canvas.width / 2, canvas.height / 2);
+const texture = new THREE.CanvasTexture(canvas);
+const labelGeometry = new THREE.PlaneGeometry(1.5, 0.2);
+const labelMaterial = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    side: THREE.DoubleSide
+});
+const label = new THREE.Mesh(labelGeometry, labelMaterial);
+label.position.y = 0.7;
+exitPortalGroup.add(label);
+
+const exitPortalParticleCount = 100;
+const exitPortalParticles = new THREE.BufferGeometry();
+const exitPortalPositions = new Float32Array(exitPortalParticleCount * 3);
+const exitPortalColors = new Float32Array(exitPortalParticleCount * 3);
+
+for (let i = 0; i < exitPortalParticleCount * 3; i += 3) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 0.5 + (Math.random() - 0.5) * 0.2;
+    exitPortalPositions[i] = Math.cos(angle) * radius;
+    exitPortalPositions[i + 1] = Math.sin(angle) * radius;
+    exitPortalPositions[i + 2] = 0;
+
+    exitPortalColors[i] = 0;
+    exitPortalColors[i + 1] = 0.8 + Math.random() * 0.2;
+    exitPortalColors[i + 2] = 0;
+}
+
+exitPortalParticles.setAttribute('position', new THREE.BufferAttribute(exitPortalPositions, 3));
+exitPortalParticles.setAttribute('color', new THREE.BufferAttribute(exitPortalColors, 3));
+
+const exitPortalParticleMaterial = new THREE.PointsMaterial({
+    size: 0.02,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.6
+});
+
+const exitPortalParticleSystem = new THREE.Points(exitPortalParticles, exitPortalParticleMaterial);
+exitPortalGroup.add(exitPortalParticleSystem);
+
+scene.add(exitPortalGroup);
+
+exitPortalBox = new THREE.Box3().setFromObject(exitPortalGroup);
+
+function animateExitPortal() {
+    const positions = exitPortalParticles.attributes.position.array;
+    for (let i = 0; i < positions.length; i += 3) {
+        positions[i + 1] += 0.005 * Math.sin(Date.now() * 0.001 + i);
+    }
+    exitPortalParticles.attributes.positon.needsUpdate = true;
+    requestAnimationFrame(animateExitPortal);
+}
+animateExitPortal();
 
 camera.position.z = 5;
 
@@ -472,6 +628,72 @@ function animate() {
             setTimeout(() => shootCooldown = 500, 5000);
         }
     });
+
+    //Update current speed
+    currentSpeed = speedFactor * 0.1;
+
+    //Check if player has entered start portal
+    if (new URLSearchParams(window.location.search).get('portal') && startPortalBox) {
+        const playerBox = new THREE.Box3().setFromObject(spaceship);
+        const portalDistance = playerBox.getCenter(new THREE.Vector3()).distanceTo(startPortalBox.getCenter(new THREE.Vector3()));
+        if (portalDistance < 0.5) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const refUrl = urlParams.get('ref');
+            if (refUrl) {
+                let url = refUrl;
+                if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                    url = 'https://' + url;
+                }
+                const currentParams = new URLSearchParams(window.location.search);
+                const newParams = new URLSearchParams();
+                for (const [key, value] of currentParams) {
+                    if (key !== 'ref') {
+                        newParams.append(key, value);
+                    }
+                }
+                newParams.append('portal', 'true');
+                const paramString = newParams.toString();
+                window.location.href = url + (paramString ? '?' + paramString : '');
+            }
+        }
+    }
+
+    //Check if player has entered exit portal
+    if (exitPortalBox) {
+        const playerBox = new THREE.Box3().setFromObject(spaceship);
+        const portalDistance = playerBox.getCenter(new THREE.Vector3()).distanceTo(exitPortalBox.getCenter(new THREE.Vector3()));
+        if (portalDistance < 0.5) {
+            const currentParams = new URLSearchParams(window.location.search);
+            const newParams = new URLSearchParams();
+            newParams.append('portal', 'true');
+            newParams.append('username', selfUsername);
+            newParams.append('color', playerColor);
+            newParams.append('speed', currentSpeed.toFixed(2));
+            newParams.append('ref', gameUrl);
+
+            newParams.append('speed_x', (speedFactor * 0.1 * Math.cos(angle)).toFixed(2));
+            newParams.append('speed_y', (speedFactor * 0.1 * Math.sin(angle)).toFixed(2));
+            newParams.append('speed_z', '0');
+            newParams.append('rotation_x', '0');
+            newParams.append('rotation_y', '0');
+            newParams.append('rotation_z', spaceship.rotation.z.toFixed(2));
+
+            const paramString = newParams.toString();
+            const nextPage = 'http://portal.pieter.com' + (paramString ? '?' + paramString : '');
+
+            if (!document.getElementById('preloadFrame')) {
+                const iframe = document.createElement('iframe');
+                iframe.id = 'preloadFrame';
+                iframe.style.display = 'none';
+                iframe.src = nextPage;
+                document.body.appendChild(iframe);
+            }
+
+            if (playerBox.intersectsBox(exitPortalBox)) {
+                window.location.href = nextPage;
+            }
+        }
+    }
 
     checkGameOver();
     renderer.render(scene, camera);
