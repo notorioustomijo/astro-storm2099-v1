@@ -1,6 +1,5 @@
 import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.module.js';
 
-
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
@@ -22,7 +21,7 @@ const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 });
 const stars = new THREE.Points(starGeometry, starMaterial);
 scene.add(stars);
 
-//Player data
+// Player data
 const selfUsername = 'spacePilot';
 const playerColor = "E0E0E0";
 let currentSpeed = 0;
@@ -129,7 +128,7 @@ flameRight.position.set(0.1, -0.3, 0);
 flameRight.rotation.x = Math.PI;
 spaceship.add(flameRight);
 
-//Create start portal (if entering via portal)
+// Create start portal (if entering via portal)
 let startPortalBox = null;
 if (new URLSearchParams(window.location.search).get('portal')) {
     const startPortalGroup = new THREE.Group();
@@ -199,14 +198,25 @@ if (new URLSearchParams(window.location.search).get('portal')) {
     animateStartPortal();
 }
 
-//Create exit portal
+// Create exit portal
 let exitPortalBox = null;
 const exitPortalGroup = new THREE.Group();
 exitPortalGroup.position.set(5, 3, 0);
 exitPortalGroup.rotation.z = 0;
 
+// Add torus ring for the exit portal
 const exitPortalGeometry = new THREE.TorusGeometry(0.5, 0.05, 16, 100);
 const exitPortalMaterial = new THREE.MeshBasicMaterial({
+    color: 0x00ff00,
+    transparent: true,
+    opacity: 0.8
+});
+const exitPortal = new THREE.Mesh(exitPortalGeometry, exitPortalMaterial);
+exitPortalGroup.add(exitPortal);
+
+// Add inner circle for the exit portal
+const exitPortalInnerGeometry = new THREE.CircleGeometry(0.4, 32);
+const exitPortalInnerMaterial = new THREE.MeshBasicMaterial({
     color: 0x00ff00,
     transparent: true,
     opacity: 0.5,
@@ -215,6 +225,7 @@ const exitPortalMaterial = new THREE.MeshBasicMaterial({
 const exitPortalInner = new THREE.Mesh(exitPortalInnerGeometry, exitPortalInnerMaterial);
 exitPortalGroup.add(exitPortalInner);
 
+// Add portal label
 const canvas = document.createElement('canvas');
 const context = canvas.getContext('2d');
 canvas.width = 256;
@@ -234,6 +245,7 @@ const label = new THREE.Mesh(labelGeometry, labelMaterial);
 label.position.y = 0.7;
 exitPortalGroup.add(label);
 
+// Add particle system for the exit portal
 const exitPortalParticleCount = 100;
 const exitPortalParticles = new THREE.BufferGeometry();
 const exitPortalPositions = new Float32Array(exitPortalParticleCount * 3);
@@ -273,7 +285,7 @@ function animateExitPortal() {
     for (let i = 0; i < positions.length; i += 3) {
         positions[i + 1] += 0.005 * Math.sin(Date.now() * 0.001 + i);
     }
-    exitPortalParticles.attributes.positon.needsUpdate = true;
+    exitPortalParticles.attributes.position.needsUpdate = true; // Fixed typo: positon -> position
     requestAnimationFrame(animateExitPortal);
 }
 animateExitPortal();
@@ -410,19 +422,18 @@ function spawnEnemyWithIndicator() {
             break;
     }
 
-    //Create the indicator as a line
     const indicatorPath = new THREE.Path();
-    indicatorPath.moveTo(0, 0.5); //Top point
-    indicatorPath.lineTo(-0.15, 0.3); //First segment of the top curve
-    indicatorPath.lineTo(-0.25, 0.1); //Second segment of the top curve
-    indicatorPath.lineTo(-0.2, 0); //Sharp inward point
-    indicatorPath.lineTo(-0.25, -0.1); //First segment of the bottom curve
-    indicatorPath.lineTo(-0.15, -0.3); //Second segment of the bottom curve
-    indicatorPath.lineTo(0, -0.5); //Bottom point
+    indicatorPath.moveTo(0, 0.5);
+    indicatorPath.lineTo(-0.15, 0.3);
+    indicatorPath.lineTo(-0.25, 0.1);
+    indicatorPath.lineTo(-0.2, 0);
+    indicatorPath.lineTo(-0.25, -0.1);
+    indicatorPath.lineTo(-0.15, -0.3);
+    indicatorPath.lineTo(0, -0.5);
 
     const indicatorCurve = new THREE.CatmullRomCurve3(indicatorPath.getPoints(10).map(p => new THREE.Vector3(p.x, p.y, 0)));
-    const indicatorGeometry = new THREE.TubeGeometry(indicatorCurve, 20, 0.005, 8, false); //small radius for a thin tube
-    const indicator = new THREE.Line(indicatorGeometry, new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+    const indicatorGeometry = new THREE.TubeGeometry(indicatorCurve, 20, 0.005, 8, false);
+    const indicator = new THREE.Mesh(indicatorGeometry, new THREE.MeshBasicMaterial({ color: 0xff0000 }));
     indicator.visible = true;
     spaceship.add(indicator);
     indicators.push({ mesh: indicator, spawnX, spawnY, spawnTime: Date.now() });
@@ -500,6 +511,10 @@ function animate() {
     requestAnimationFrame(animate);
     if (gameOver) return;
 
+    // Initialize speedFactor and angle
+    let speedFactor = 0;
+    let angle = spaceship.rotation.z;
+
     // Calculate distance between spaceship and ring (mouse position)
     const distanceToMouse = Math.sqrt(
         (spaceship.position.x - targetPosition.x) ** 2 +
@@ -509,12 +524,11 @@ function animate() {
     // Rotate spaceship to face the ring
     const dx = targetPosition.x - spaceship.position.x;
     const dy = targetPosition.y - spaceship.position.y;
-    const angle = Math.atan2(dy, dx);
+    angle = Math.atan2(dy, dx);
     spaceship.rotation.z = angle - Math.PI / 2;
 
     // Adjust speed based on distance
     const stopThreshold = 0.1;
-    let speedFactor = 0;
     if (distanceToMouse > stopThreshold) {
         speedFactor = Math.min(distanceToMouse / 5, 1);
         const maxSpeed = 0.1;
@@ -629,10 +643,10 @@ function animate() {
         }
     });
 
-    //Update current speed
+    // Update current speed
     currentSpeed = speedFactor * 0.1;
 
-    //Check if player has entered start portal
+    // Check if player has entered start portal
     if (new URLSearchParams(window.location.search).get('portal') && startPortalBox) {
         const playerBox = new THREE.Box3().setFromObject(spaceship);
         const portalDistance = playerBox.getCenter(new THREE.Vector3()).distanceTo(startPortalBox.getCenter(new THREE.Vector3()));
@@ -658,7 +672,7 @@ function animate() {
         }
     }
 
-    //Check if player has entered exit portal
+    // Check if player has entered exit portal
     if (exitPortalBox) {
         const playerBox = new THREE.Box3().setFromObject(spaceship);
         const portalDistance = playerBox.getCenter(new THREE.Vector3()).distanceTo(exitPortalBox.getCenter(new THREE.Vector3()));
